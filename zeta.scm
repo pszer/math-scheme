@@ -237,5 +237,5 @@
 ;;; approximation of pi, because in calculating pi we use a square
 ;;; root on zeta(2) which effectively negates the fastly converging
 ;;; nature of 1/x^2 .
-(define pi-approx 
-	(sqrt (* 6 (real (sum-complex 1 2500 (zeta-term (complex 2.0 0.0)))))))
+;(define pi-approx 
+;	(sqrt (* 6 (real (sum-complex 1 2500 (zeta-term (complex 2.0 0.0)))))))
