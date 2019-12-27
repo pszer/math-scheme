@@ -1,7 +1,7 @@
 ;;; zeta.scm
 ;;;
-;;; defines function (zeta z)
-;;; Approximation for function zeta(z) = Σ[r=0,inf] {r^-z}
+;;; Defines functions (zeta z) (better-zeta z)
+;;; Approximations for function zeta(z) = Σ[r=0,inf] {r^-z}
 ;;;
 ;;; Definition for infinite sums for some 
 ;;; sequence Ai ∈ C  :  (call it partial summing)
@@ -9,48 +9,48 @@
 ;;; where Sr is the partial sum of Ar (Σ[i=0,r] Ai).
 ;;;
 ;;; zeta(z) converges completely for Real(z) > 1.0 using partial
-;;; summing, diverges for any Real(z) < 0.0.
+;;; summing, diverges for any Real(z) < 1.
 ;;;
-;;; zeta can be represented in an alternating form, which we'll call beta.
+;;; zeta can be represented in an alternating form, which we'll call eta.
 ;;;
 ;;; Assume zeta(z) converges for z, letting us use the fact that
 ;;; q * (Σ[r=0,inf] {Ar}) = Σ[r=0,inf] {q*Ar}
 ;;; for convergent series.
 ;;; 
-;;; beta(z) = Σ[r=0,inf] {(-1)^r * r^-z}; the alternating version of zeta
+;;; eta(z) = Σ[r=0,inf] {(-1)^r * r^-z}; the alternating version of zeta
 ;;;
 ;;; P =         zeta(z) = 1^-z  +  2^-z  +  3^-z  +  4^-z  +  5^-z + ... -> inf
 ;;; Q = (2*2^-z)zeta(z) =        2*2^-z  +         2*4^-z  +         ... -> inf
 ;;; then
 ;;; P-Q                 = 1^-z - 2^-z + 3^-z - 4^-z + 5^-z - 6^-z ... -> inf
-;;;                     = beta(z)
-;;; (1-2*2^-z)zeta(z)   = beta(z)
+;;;                     = eta(z)
+;;; (1-2*2^-z)zeta(z)   = eta(z)
 ;;;
-;;; Finally, an alternative definition of zeta(z) in terms of its alternating beta
+;;; Finally, an alternative definition of zeta(z) in terms of its alternating eta
 ;;; form is
-;;; zeta(z) = beta(z) / (1-2/2^-z)
+;;; zeta(z) = eta(z) / (1-2/2^-z)
 ;;;
-;;; This definition is useful because the beta function converges when
+;;; This definition is useful because the eta function converges when
 ;;; using 'Cesaro summation'.
 ;;;
 ;;; A Cesaro sum for some sequence Ai is
-;;; lim[n->inf] = Σ[r=0,n] {Ar} / n
-;;; i.e. the limit of the average of the partial sum.
+;;; lim[n->inf] Σ[r=0,n] {Sr} / n
+;;; i.e. the limit of the average of the partial sums.
 ;;;
 ;;; Cesaro summation is an extension of normal partial summing
 ;;; i.e. if P is the set of all series evaluable by partial summing
 ;;;      and C is the set of all series evaluable by Cesaro summing
-;;;      C is a proper subset of P.
+;;;      P is a proper subset of C.
 ;;;      AND if S ∈ P, then the partial sum of S = Cesaro sum of S.
 ;;; Cesaro summation extends the domain of the operation of
 ;;; infinite summing.
 ;;;
-;;; Cesaro summation can be repeated several times by replacing Ar in the
-;;; previous definition with partial Cesaro sums Cr.
+;;; Cesaro summation can be repeated several times by replacing Sr in the
+;;; previous definition with the partial Cesaro sums Cr.
 ;;; From this it follows that :
 ;;; Let set Cn be the set of series evaluable with Cesaro sums repeated 'n' times
 ;;; Let set Cm be the same except repeated 'm' times, then Cn is a proper subset of Cm.
-;;; Repeating Cesaro summation is more powerful, [Note: limit of C[inf] != universal set] 
+;;; i.e Repeating Cesaro summation is more powerful, [Note: limit of C[inf] != universal set] 
 ;;;
 ;;; Certain divergent series can be evaluated using Cesaro summation
 ;;; For example, the sequence Ai = 1 : 0 ? (even? i)
@@ -67,10 +67,10 @@
 ;;; So the Cesaro sum of 1+0+1+0+1+0+1+... C= 1/2
 ;;; [Noted as C= instead of = to signify it's not a normal sum]
 ;;;
-;;; beta(z) converges for Real(z) > 1.0
+;;; eta(z) converges for Real(z) > 1.0
 ;;; Using Cesaro summation repeated 'n' times, the domain of
-;;; beta(z) changes to Real(z) > 1.0 - n
-;;; Using Cesaro summation we can evaluate beta(z) at any point
+;;; eta(z) changes to Real(z) > 1.0 - n
+;;; Using Cesaro summation we can evaluate eta(z) at any point
 ;;; z ∈ C, at least theoretically. In computing it directly
 ;;; we are heavily limited by the accuracy of our floating point
 ;;; representation.
@@ -206,13 +206,13 @@
 
 (define (zeta-term z)
 	(lambda (n) (exp-complex n (neg-complex z))))
-(define (beta-term z)
+(define (eta-term z)
 	(lambda (n) (if (odd? n)
 			(exp-complex n (neg-complex z))
 			(neg-complex (exp-complex n (neg-complex z))))))
 
 
-(define (beta-coeff z) ; 1-2/2^z
+(define (eta-coeff z) ; 1-2/2^z
 	(sub-complex (complex 1 0)
 		     (div-complex (complex 2 0)
 				  (exp-complex 2 z))))
@@ -221,9 +221,9 @@
 	(cond
 		((number? z) (zeta (complex z 0)))
 		((> (real z) 1) (sum-complex 1 zeta-terms (zeta-term z)))
-		(else (div-complex (sum-cesaro 1 zeta-terms (beta-term z)
+		(else (div-complex (sum-cesaro 1 zeta-terms (eta-term z)
 		                               (+ 1 (floor (abs (real z)))))
-		                   (beta-coeff z)))
+		                   (eta-coeff z)))
 	))
 
 ;;; zeta(2) as an approximation of pi.
@@ -250,21 +250,6 @@
 ;;; 'functional form'
 ;;; zeta(z) = 2^z pi^(z-1) sin[(s*pi)/2] Γ(1-s) zeta(1-s) 
 ;;; where Γ is the gamma function.
-;;; zeta(z) converges for σ < 1
-;;; the functional form conerges for σ > 1
-
-(define (better-zeta z)
-	(define pi 3.14159265359)
-	(cond
-	    ((number? z) (zeta (complex z 0)))
-	    ((> (real z) 1) (zeta z))
-	    (else
-		(mul-complex
-            		(exp-complex 2 z)
-	    		(exp-complex pi (sub-complex z (complex 1 0)))
-	    		(sin-complex (div-complex (mul-complex z (complex pi 0)) (complex 2 0)))
-	    		(gamma (sub-complex (complex 1 0) z))
-	    		(zeta  (sub-complex (complex 1 0) z))))))
 
 ;;; Γ(z) = int[0,inf] {x^(z-1)*e^-x dx}
 (define (integral f a b dx)
@@ -292,3 +277,18 @@
 	(div-complex (sub-complex (exp-complex e zi)
 	                          (exp-complex e (neg-complex zi)))
 	             (complex 0 2)))
+
+(define (better-zeta z)
+	(define pi 3.14159265359)
+	(cond
+	    ((number? z) (zeta (complex z 0)))
+	    ((> (real z) 0) (zeta z))
+	    (else
+		(mul-complex
+            		(exp-complex 2 z)
+	    		(exp-complex pi (sub-complex z (complex 1 0)))
+	    		(sin-complex (div-complex (mul-complex z (complex pi 0)) (complex 2 0)))
+	    		(gamma (sub-complex (complex 1 0) z))
+	    		(zeta  (sub-complex (complex 1 0) z))))))
+
+ 
