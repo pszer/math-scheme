@@ -11,11 +11,13 @@
 ;;; zeta(z) converges completely for Real(z) > 1.0 using partial
 ;;; summing, diverges for any Real(z) < 0.0.
 ;;;
-;;; Assuming zeta(z) converges for z, letting us use the fact that
+;;; zeta can be represented in an alternating form, which we'll call beta.
+;;;
+;;; Assume zeta(z) converges for z, letting us use the fact that
 ;;; q * (Σ[r=0,inf] {Ar}) = Σ[r=0,inf] {q*Ar}
 ;;; for convergent series.
 ;;; 
-;;; beta(z) = Σ[r=0,inf] {(-1)^r * r^-z}; the 'alternating version of zeta
+;;; beta(z) = Σ[r=0,inf] {(-1)^r * r^-z}; the alternating version of zeta
 ;;;
 ;;; P =         zeta(z) = 1^-z  +  2^-z  +  3^-z  +  4^-z  +  5^-z + ... -> inf
 ;;; Q = (2*2^-z)zeta(z) =        2*2^-z  +         2*4^-z  +         ... -> inf
@@ -24,7 +26,7 @@
 ;;;                     = beta(z)
 ;;; (1-2*2^-z)zeta(z)   = beta(z)
 ;;;
-;;; Finally, an alternative definition of zeta(z) in terms of it's alternating 'beta'
+;;; Finally, an alternative definition of zeta(z) in terms of its alternating beta
 ;;; form is
 ;;; zeta(z) = beta(z) / (1-2/2^-z)
 ;;;
@@ -170,9 +172,12 @@
 (define (sub-complex a b) (complex
                                (- (real a) (real b))
                                (- (imag a) (imag b))))
-(define (mul-complex a b) (complex
-                               (- (* (real a) (real b)) (* (imag a) (imag b)))
-                               (+ (* (real a) (imag b)) (* (imag a) (real b)))))
+(define (mul-complex a b . rest)
+	(let ((result (complex (- (* (real a) (real b)) (* (imag a) (imag b)))
+		               (+ (* (real a) (imag b)) (* (imag a) (real b))))))
+		(if (null? rest)
+			result
+			(apply mul-complex (cons result (cons (car rest) (cdr rest)))))))
 
 ;;; z/w = (a+bi)/(c+di)
 ;;;     = (a+bi)(c-di)/(c+di)(c-di)
@@ -191,7 +196,7 @@
 ;;; e^(ln[b]*bi) = cos(ln[b]*b) + sin(ln[b]*b)i
 ;;; The problem of real^imag now becomes (real^real)*imag.
 (define (exp-complex base exponent)
-	(define const-e 2.7182817934736)
+	(define const-e (exp 1))
 	(let ((log-base (log base)))
 		(mul-complex 
 			(complex (expt const-e (* log-base (real exponent)))
@@ -213,12 +218,13 @@
 				  (exp-complex 2 z))))
 (define zeta-terms 8000)
 (define (zeta z)
-	(if (> (real z) 1)
-	    (sum-complex 1 zeta-terms (zeta-term z))
-	    (div-complex
-	        (sum-cesaro 1 zeta-terms (beta-term z)
-	                    (+ 1 (floor (abs (real z)))))
-		(beta-coeff z))))
+	(cond
+		((number? z) (zeta (complex z 0)))
+		((> (real z) 1) (sum-complex 1 zeta-terms (zeta-term z)))
+		(else (div-complex (sum-cesaro 1 zeta-terms (beta-term z)
+		                               (+ 1 (floor (abs (real z)))))
+		                   (beta-coeff z)))
+	))
 
 ;;; zeta(2) as an approximation of pi.
 ;;;
@@ -235,7 +241,54 @@
 ;;; zeta(2) converges relatively quickly because 1/x^2 becomes
 ;;; small very quickly, but doesn't converge too quickly as an
 ;;; approximation of pi, because in calculating pi we use a square
-;;; root on zeta(2) which effectively negates the fastly converging
+;;; root on zeta(2) which effectively negates the quickly converging
 ;;; nature of 1/x^2 .
 ;(define pi-approx 
 ;	(sqrt (* 6 (real (sum-complex 1 2500 (zeta-term (complex 2.0 0.0)))))))
+
+;;; A better way of calculating zeta for σ < 1 is with its
+;;; 'functional form'
+;;; zeta(z) = 2^z pi^(z-1) sin[(s*pi)/2] Γ(1-s) zeta(1-s) 
+;;; where Γ is the gamma function.
+;;; zeta(z) converges for σ < 1
+;;; the functional form conerges for σ > 1
+
+(define (better-zeta z)
+	(define pi 3.14159265359)
+	(cond
+	    ((number? z) (zeta (complex z 0)))
+	    ((> (real z) 1) (zeta z))
+	    (else
+		(mul-complex
+            		(exp-complex 2 z)
+	    		(exp-complex pi (sub-complex z (complex 1 0)))
+	    		(sin-complex (div-complex (mul-complex z (complex pi 0)) (complex 2 0)))
+	    		(gamma (sub-complex (complex 1 0) z))
+	    		(zeta  (sub-complex (complex 1 0) z))))))
+
+;;; Γ(z) = int[0,inf] {x^(z-1)*e^-x dx}
+(define (integral f a b dx)
+	(define (add-dx x) (+ x dx))
+	(define (sum term a next b)
+		(accumulate add-complex (complex 0 0) term a next b))
+	(define (accumulate combiner null-value term a next b)
+		(define (iter total r)
+			(if (> r b)
+			     total
+			     (iter (combiner total (term r)) (next r))))
+		(iter null-value a))
+	(mul-complex (sum f (+ a (/ dx 2)) add-dx b) (complex dx 0)))
+(define (gamma z)
+	(define m-one (sub-complex z (complex 1 0)))
+	(define (term x) (mul-complex (exp-complex x m-one) (complex (exp (- x)) 0)))
+	(define (square x) (* x x))
+	(integral term 0 (max 100 (square (real z))) 0.05))
+
+;;; exponential form of sin
+;;; sin(z) = (e^zi - e^-zi)/2i
+(define (sin-complex z)
+	(define e (exp 1))
+	(define zi (mul-complex z (complex 0 1)))
+	(div-complex (sub-complex (exp-complex e zi)
+	                          (exp-complex e (neg-complex zi)))
+	             (complex 0 2)))
