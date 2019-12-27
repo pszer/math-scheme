@@ -1,6 +1,9 @@
 ;;; derivative.scm
 ;;; (deriv expression var)            - Performs symbolic derivation on an expression
-;;; (calc-deriv expression var point) - Calculates a deriative at a point 
+;;; (calc-deriv expression var point) - Calculates a deriative at a point
+;;;
+;;; Can differentiate expressions containing
+;;; + - * / sin cos tan expt log
 
 (define (calc-deriv exp var point)
 	(define e 2.718281828459045)
@@ -19,7 +22,6 @@
 		(and (variable? v1) (variable? v2) (eq? v1 v2)))
 
 	(define (=number? exp num) (and (number? exp) (= exp num)))
-	(define (is-quotient? exp) (and (pair? exp) (eq? (car exp) '/)))
 	(define (make-sum     a1 a2)
 		(cond
 			((=number? a1 0) a2)
@@ -27,13 +29,20 @@
 			((and (number? a1) (number? a2))
 				(+ a1 a2))
 			(else (list '+ a1 a2))))
+	(define (make-difference a1 a2)
+		(cond
+			((=number? a1 0) (if (number? a2) (- a2) (list '- a2)))
+			((=number? a2 0) a1)
+			((and (number? a1) (number? a2))
+				(- a1 a2))
+			(else (list '- a1 a2))))
 	(define (make-product m1 m2)
 		(cond
 			((or (=number? m1 0) (=number? m2 0)) 0)
 			((=number? m1 1) m2)
 			((=number? m2 1) m1)
-			((and (is-quotient? m1) (equal? m2 (caddr m1))) 1)
-			((and (is-quotient? m2) (equal? m1 (caddr m2))) 1)
+			((and (quotient? m1) (equal? m2 (denominator m1))) 1)
+			((and (quotient? m2) (equal? m1 (denominator m2))) 1)
 			((and (number? m1) (number? m2))
 				(* m1 m2))
 			(else (list '* m1 m2))))
@@ -88,13 +97,20 @@
 		      (else (make-product (deriv (make-product (make-log base) power) var)
 		                          (make-exponent base power)))))
 
+	(define (get-quotient-deriv num den var)
+		(make-quotient (make-difference (make-product (deriv num var) den)
+		                                (make-product (deriv den var) num))
+		               (make-exponent den 2)))
+
 	(define (get-log-deriv argument var)
 		(make-quotient (deriv argument var) argument))
 
-	(define (sum?      x) (and (pair? x) (eq? (car x) '+)))
-	(define (product?  x) (and (pair? x) (eq? (car x) '*)))
-	(define (exponent? x) (and (pair? x) (eq? (car x) 'expt)))
-	(define (log?      x) (and (pair? x) (eq? (car x) 'log)))
+	(define (sum?        x) (and (pair? x) (eq? (car x) '+)))
+	(define (difference? x) (and (pair? x) (eq? (car x) '-)))
+	(define (product?    x) (and (pair? x) (eq? (car x) '*)))
+	(define (exponent?   x) (and (pair? x) (eq? (car x) 'expt)))
+	(define (quotient?   x) (and (pair? x) (eq? (car x) '/)))
+	(define (log?        x) (and (pair? x) (eq? (car x) 'log)))
 	(define (trig? x)
 		(define (test seq)
 			(cond ((null? seq) #f)
@@ -118,6 +134,9 @@
 				(car rest)
 				(cons '* rest))))
 
+	(define (numerator   q) (cadr  q))
+	(define (denominator q) (caddr q))
+
 	(define (exp-base  e) (cadr  e))
 	(define (exp-power e) (caddr e))
 	(cond
@@ -125,6 +144,8 @@
 		((variable? exp) (if (same-variable? exp var) 1 0))
 		((sum? exp) (make-sum (deriv (addend exp) var)
 		                      (deriv (augend exp) var)))
+		((difference? exp) (make-difference (deriv (addend exp) var)
+		                                    (deriv (augend exp) var)))
 		((product? exp)
 		 (make-sum
 			(make-product (multiplier exp)
@@ -132,9 +153,9 @@
 			(make-product (deriv (multiplier exp) var)
 			              (multiplicand exp))))
 		((exponent? exp)
-			;(make-product (exp-power exp)
-			;              (make-exponent (exp-base exp) (- (exp-power exp) 1))))
 			(get-exponent-deriv (exp-base exp) (exp-power exp) var))
+		((quotient? exp)
+			(get-quotient-deriv (numerator exp) (denominator exp) var))
 		((trig? exp)
 			(make-product (deriv (cadr exp) var)
 			              (get-trig-deriv (car exp) (cadr exp))))
